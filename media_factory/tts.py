@@ -158,17 +158,22 @@ def _split_text_chunks(text: str, max_chars: int = _OPENAI_TTS_LIMIT) -> list[st
 def _tts_openai(text: str, path: str, voice: str, model: str) -> None:
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # Optional instructions for gpt-4o-mini-tts (steering tone)
+    instructions = os.getenv("TTS_INSTRUCTIONS", "").strip()
+    extra = {"instructions": instructions} if instructions and "gpt-4o" in model else {}
+
     chunks = _split_text_chunks(text)
     if len(chunks) == 1:
-        response = client.audio.speech.create(model=model, voice=voice, input=chunks[0], response_format="mp3")
+        response = client.audio.speech.create(model=model, voice=voice, input=chunks[0], response_format="mp3", **extra)
         response.stream_to_file(path)
         return
-    # multiple chunks — generate each, then concat with ffmpeg
+    # multiple chunks - generate each, then concat with ffmpeg
     with tempfile.TemporaryDirectory() as tmpdir:
         chunk_paths = []
         for i, chunk in enumerate(chunks):
             chunk_path = str(Path(tmpdir) / f"chunk_{i:03d}.mp3")
-            response = client.audio.speech.create(model=model, voice=voice, input=chunk, response_format="mp3")
+            response = client.audio.speech.create(model=model, voice=voice, input=chunk, response_format="mp3", **extra)
             response.stream_to_file(chunk_path)
             chunk_paths.append(chunk_path)
         list_file = str(Path(tmpdir) / "chunks.txt")
