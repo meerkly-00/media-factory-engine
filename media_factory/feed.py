@@ -105,6 +105,13 @@ def add_episode(feed_path, title, audio_url, audio_size_bytes, script_xml, pub_d
     if artwork_url:
         SubElement(item, f"{{{_ITUNES_NS}}}image", {"href": artwork_url})
 
+    # Dé-duplication : retire tout item existant ayant le même guid (même date/épisode)
+    # pour éviter les doublons quand un épisode est (re)généré le même jour.
+    for existing in list(channel.findall("item")):
+        g = existing.find("guid")
+        if g is not None and g.text == audio_url:
+            channel.remove(existing)
+
     first_item = channel.find("item")
     if first_item is not None:
         channel.insert(list(channel).index(first_item), item)
