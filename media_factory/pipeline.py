@@ -128,7 +128,7 @@ def run(
     logger.info("=== Etape 4 : Generation audio TTS ===")
     audio_filename = f"{audio_prefix}{date_slug}.mp3"
     audio_path = str(audio_dir / audio_filename)
-    generate_audio(script_xml, audio_path)
+    generate_audio(script_xml, audio_path, project_root=project_root_p)
     result["audio_path"] = audio_path
 
     if skip_feed:

@@ -111,3 +111,74 @@ def generate_script(
         len(script.split()) / 150,
     )
     return script
+
+
+# ── Mode DIALOGUE (2 voix) ──────────────────────────────────────────────────
+# Convertit un script monologue en dialogue radio à deux animateurs.
+# Opt-in : utilisé seulement quand EPISODE_MODE=dialogue (voir tts.generate_audio).
+
+_DIALOGUE_SYSTEM_PROMPT = """Tu transformes un script de bulletin sportif (monologue) en DIALOGUE radio \
+à deux animateurs québécois.
+
+Les deux voix :
+- F = l'animateur : énergique, lance les sujets, pose des questions courtes, fait les \
+transitions, réagit ("Han!", "Voyons donc!", "Wow").
+- S = l'analyste : développe, donne les faits, les chiffres et les sources, donne son \
+opinion ("mon take").
+
+Règles STRICTES :
+- Conserve TOUS les faits, noms, chiffres et sources ("selon La Presse", "selon Sportsnet"…) \
+du script source. N'invente RIEN, n'ajoute aucune info absente.
+- Style parlé québécois naturel : phrases courtes, vraies réactions, tours INÉGAUX (l'animateur \
+lance court, l'analyste développe). Pas de ping-pong 50/50 mécanique.
+- Emploie les termes FRANÇAIS du sport (blanchissage, prolongation, avantage numérique, \
+repêchage), jamais l'équivalent anglais.
+- NE dis JAMAIS de méta du genre "les détails ne sont pas dans les sources" : si une info \
+manque, on n'en parle simplement pas.
+- Pas de fausse citation d'un seul mot ("je le cite … fin de citation"). Cite seulement de \
+vraies phrases complètes.
+- Garde la MÊME structure de segments que le source, avec les MÊMES titres.
+- L'animateur ouvre par "Sept heures, t'es au Buzzer!" et termine par une formule chaleureuse \
+type "C'était le Buzzer. Bonne journée, pis lâchez-pas!".
+
+Réponds UNIQUEMENT avec ce format, rien d'autre :
+<dialogue>
+<seg titre="Introduction">
+F: ...
+S: ...
+</seg>
+<seg titre="Titre du chapitre">
+F: ...
+S: ...
+</seg>
+</dialogue>"""
+
+
+def generate_dialogue(
+    script_xml: str,
+    model: str | None = None,
+    system_prompt: str | None = None,
+) -> str:
+    """2e appel Claude : convertit le script monologue en dialogue 2 voix.
+
+    Le prompt peut être surchargé via le fichier DIALOGUE_PROMPT_FILE (env).
+    """
+    model = model or os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+    if system_prompt is None:
+        prompt_file = os.getenv("DIALOGUE_PROMPT_FILE")
+        if prompt_file and Path(prompt_file).exists():
+            system_prompt = Path(prompt_file).read_text(encoding="utf-8")
+        else:
+            system_prompt = _DIALOGUE_SYSTEM_PROMPT
+
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    logger.info("Appel Claude %s (conversion dialogue) ...", model)
+    message = client.messages.create(
+        model=model,
+        max_tokens=8192,
+        system=system_prompt,
+        messages=[{"role": "user", "content": script_xml}],
+    )
+    dialogue = message.content[0].text.strip()
+    logger.info("Dialogue généré : ~%d caractères", len(dialogue))
+    return dialogue

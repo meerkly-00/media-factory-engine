@@ -263,7 +263,20 @@ def _add_chapter_markers(mp3_path: str, chapters: list[dict]) -> None:
     tags.save(mp3_path, v2_version=3)
 
 
-def generate_audio(script_xml: str, output_path: str) -> str:
+def generate_audio(script_xml: str, output_path: str, project_root=None) -> str:
+    # Mode DIALOGUE (2 voix + jingles) — opt-in via EPISODE_MODE=dialogue.
+    # Le chemin par défaut (monologue) reste inchangé pour les autres projets.
+    if os.getenv("EPISODE_MODE", "").lower() == "dialogue":
+        from pathlib import Path as _Path
+        root = _Path(project_root or os.getenv("PROJECT_ROOT") or os.getcwd()).resolve()
+        try:
+            from .dialogue import generate_audio_dialogue
+            logger.info("Mode DIALOGUE (2 voix ElevenLabs) activé.")
+            return generate_audio_dialogue(script_xml, output_path, root)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Mode dialogue échoué (%s) — fallback voix simple.", e)
+            # on continue vers le chemin monologue ci-dessous
+
     segments = parse_script(script_xml)
     if not segments:
         raise ValueError("Aucun segment trouvé dans le script XML.")
